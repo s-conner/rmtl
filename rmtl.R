@@ -1,7 +1,15 @@
 
 ### Function to estimate the IPW-adjusted RMTL
 ### Null weights yields the unadjusted RMTL
-### Last updated by Sarah Conner on June 2 2020
+### Sarah Conner, Updated June 16 2020
+
+library(survival)
+
+
+#entry=af$entry55; times=af$time_55; event=af$event_55; group=af$male; weight=NULL; tau=NULL
+#entry=dat$entry; times=dat$x; event=dat$event; eoi=2; group=as.factor(dat$a); weight=dat$weight; tau=1
+
+#times=af$fu; event=af$cod; eoi=1; tau=40; group=af$male2; entry=weight=NULL; alpha=.05; yaxismax=.5
 
 rmtl <- function(entry=NULL, times, event, eoi=1, group=NULL, weight=NULL, tau=NULL, alpha=.05, yaxismax=1){  
 
@@ -97,45 +105,45 @@ rmtl <- function(entry=NULL, times, event, eoi=1, group=NULL, weight=NULL, tau=N
             var.theta <- ((theta)^2) * (((num.atrisk - num.ev1)/(mg * num.ev1)) + a)
             var.theta[is.nan(var.theta)] <- 0
             
-            sum.var.theta <- cumsum(var.theta) 
+            #sum.var.theta <- cumsum(var.theta) 
             
             
-            #---  Covariance of thetas for j<k --- 
+            #---  Covariance of thetas --- 
             
             cov.theta <- matrix(NA, nrow=num.tj, ncol=num.tj)
             b <- c(0,cumsum(num.ev/(mg * (num.atrisk - num.ev))))
             
             for(j in 1:(num.tj-1)){
               for(k in (j+1):num.tj){
-                cov.theta[j,k] <- (theta[j]) * (theta[k]) * (-1/num.atrisk[j] + b[j])
+                cov.theta[k,j] <- cov.theta[j,k] <- (theta[j]) * (theta[k]) * (-1/num.atrisk[j] + b[j])
               }
             }
             
-            cov.theta2 <- rowSums(cov.theta, na.rm=TRUE)
-            sum.cov.theta <- cumsum(cov.theta2)
+            # Diagonal is variance of thetas
+            diag(cov.theta) <- var.theta
             
             
-            #---  Variances of CIF at each timepoint --- 
+            #---  Covariances of CIF --- 
             
-            var.f1 <- sum.var.theta + 2*sum.cov.theta
-            se.f1 <- sqrt(var.f1)
+            cov.f10 <- apply(cov.theta, 2, function(x){x[is.na(x)] <- 0;  cumsum(x)})
+            cov.f1 <- apply(cov.f10, 1, function(x){x[is.na(x)] <- 0;  cumsum(x)})
+            
+            var.f1 <- diag(cov.f1) # not sure if this is needed, but for sanity check
+            
+            #etm <- etmCIF(Surv(times, event != 0) ~ 1, data=data, etype=event, failcode=1)
+            #etm.se.0 <- sqrt(unname(etm[[1]]$cov[4,4,]))
+            #all.equal(etm.se.0, sqrt(var.f1))
             
             
             #--- RMTL and variance ---
-          
+            
             areas <- c(tj[2:num.tj], tau)-tj
             rmtl[g] <- sum(areas*cif1)
             
-            cov.f1 <- matrix(NA, nrow=num.tj, ncol=num.tj)
-            
-            cov.theta.col <- apply(cov.theta, 2, function(x){x[is.na(x)]<-0; cumsum(x) } ) 
-            cov.f1 <- t(apply(cov.theta.col, 1, function(x){x[is.na(x)]<-0; cumsum(x) })) + var.f1
-            cov.f1[lower.tri(cov.f1, diag=T)] <- NA
-            
             cov.weights <- outer(areas,areas)
-            rmtl.covs <- rowSums(cov.weights * cov.f1, na.rm=TRUE)
+            cov.f1.weight <- cov.weights * cov.f1
             
-            rmtl.var <- sum((areas^2)*var.f1) + 2*sum(rmtl.covs)
+            rmtl.var <- sum(cov.f1.weight)
             rmtl.se[g] <- sqrt(rmtl.var) 
             
           }
@@ -207,7 +215,7 @@ rmtl <- function(entry=NULL, times, event, eoi=1, group=NULL, weight=NULL, tau=N
             print(rmtl.diff.round)
             cat("\n\n")
             
-            invisible(allres)
+            return(allres)
             
           } else { # No groups, thus no pairwise comparison
             
@@ -217,7 +225,7 @@ rmtl <- function(entry=NULL, times, event, eoi=1, group=NULL, weight=NULL, tau=N
             print(round(res[c(2:5)],3))
             cat("\n\n")
             
-            invisible(res)
+            return(res)
 
           }
         
