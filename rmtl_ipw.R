@@ -1,7 +1,7 @@
 
 ### Function to estimate the IPW-adjusted RMTL
 ### Null weights yields the unadjusted RMTL
-### Sarah Conner, Updated June 16 2020
+### Sarah Conner, Updated September 30 2020
 
 library(survival)
 
@@ -115,7 +115,8 @@ rmtl <- function(entry=NULL, times, event, eoi=1, group=NULL, weight=NULL, tau=N
             
             for(j in 1:(num.tj-1)){
               for(k in (j+1):num.tj){
-                cov.theta[k,j] <- cov.theta[j,k] <- (theta[j]) * (theta[k]) * (-1/num.atrisk[j] + b[j])
+                #cov.theta[k,j] <- cov.theta[j,k] <- (theta[j]) * (theta[k]) * (-1/num.atrisk[j] + b[j])
+                cov.theta[k,j] <- cov.theta[j,k] <- (theta[j]) * (theta[k]) * (-1/mg[j] + b[j])
               }
             }
             
