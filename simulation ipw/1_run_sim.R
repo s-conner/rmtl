@@ -1,7 +1,7 @@
 ### Code to replicate simulation study to assess IPW estimator 
 ### of adjusted difference in RMTL with competing risks
 
-### Last updated by Sarah Conner on June 2 2020
+### Last updated by Sarah Conner on October 22 2020
 
 
 # --- Load parameters for each scenario ---
@@ -151,6 +151,7 @@ rmtl.sim <- function(entry=NULL, times, event, eoi=1, group=NULL, weight=NULL, t
           theta <- s * h1
           cif1 <- cumsum(theta)
           
+          
           #---  Variance of each theta --- 
           
           a <- c(0,cumsum(num.ev/(mg * (num.atrisk - num.ev))))
@@ -159,28 +160,28 @@ rmtl.sim <- function(entry=NULL, times, event, eoi=1, group=NULL, weight=NULL, t
           var.theta <- ((theta)^2) * (((num.atrisk - num.ev1)/(mg * num.ev1)) + a)
           var.theta[is.nan(var.theta)] <- 0
           
-          sum.var.theta <- cumsum(var.theta) 
           
-          
-          #---  Covariance of thetas for j<k --- 
+          #---  Covariance of thetas --- 
           
           cov.theta <- matrix(NA, nrow=num.tj, ncol=num.tj)
           b <- c(0,cumsum(num.ev/(mg * (num.atrisk - num.ev))))
           
           for(j in 1:(num.tj-1)){
             for(k in (j+1):num.tj){
-              cov.theta[j,k] <- (theta[j]) * (theta[k]) * (-1/num.atrisk[j] + b[j])
+              cov.theta[k,j] <- cov.theta[j,k] <- (theta[j]) * (theta[k]) * (-1/mg[j] + b[j])
             }
           }
           
-          cov.theta2 <- rowSums(cov.theta, na.rm=TRUE)
-          sum.cov.theta <- cumsum(cov.theta2)
+          # Diagonal is variance of thetas
+          diag(cov.theta) <- var.theta
           
           
-          #---  Variances of CIF at each timepoint --- 
+          #---  Covariances of CIF --- 
           
-          var.f1 <- sum.var.theta + 2*sum.cov.theta
-          se.f1 <- sqrt(var.f1)
+          cov.f10 <- apply(cov.theta, 2, function(x){x[is.na(x)] <- 0;  cumsum(x)})
+          cov.f1 <- apply(cov.f10, 1, function(x){x[is.na(x)] <- 0;  cumsum(x)})
+          
+          var.f1 <- diag(cov.f1) # not sure if this is needed, but for sanity check
           
           
           #--- RMTL and variance ---
@@ -188,16 +189,10 @@ rmtl.sim <- function(entry=NULL, times, event, eoi=1, group=NULL, weight=NULL, t
           areas <- c(tj[2:num.tj], tau)-tj
           rmtl[g] <- sum(areas*cif1)
           
-          cov.f1 <- matrix(NA, nrow=num.tj, ncol=num.tj)
-          
-          cov.theta.col <- apply(cov.theta, 2, function(x){x[is.na(x)]<-0; cumsum(x) } ) 
-          cov.f1 <- t(apply(cov.theta.col, 1, function(x){x[is.na(x)]<-0; cumsum(x) })) + var.f1
-          cov.f1[lower.tri(cov.f1, diag=T)] <- NA
-          
           cov.weights <- outer(areas,areas)
-          rmtl.covs <- rowSums(cov.weights * cov.f1, na.rm=TRUE)
+          cov.f1.weight <- cov.weights * cov.f1
           
-          rmtl.var <- sum((areas^2)*var.f1) + 2*sum(rmtl.covs)
+          rmtl.var <- sum(cov.f1.weight)
           rmtl.se[g] <- sqrt(rmtl.var) 
           
         }
@@ -243,5 +238,5 @@ for(i in 1:nsim){
 # --- Export all iterations ---
 
 colnames(simresults) <- c('simid', 'rmtl0', 'rmtl0.se', 'rmtl1', 'rmtl1.se', 'rmtldiff', 'rmtldiff.se', 'rmtldiff.p', 'rmtldiff.cil', 'rmtldiff.ciu')
-# write.csv(simresults, paste0("simresults_", p, ".csv"), row.names=FALSE)
+write.csv(simresults, paste0("simresults_", p, ".csv"), row.names=FALSE)
 
