@@ -5,18 +5,10 @@
 
 library(survival)
 
-
-#entry=af$entry55; times=af$time_55; event=af$event_55; group=af$male; weight=NULL; tau=NULL
-#entry=dat$entry; times=dat$x; event=dat$event; eoi=2; group=as.factor(dat$a); weight=dat$weight; tau=1
-
-#times=af$fu; event=af$cod; eoi=1; tau=40; group=af$male2; entry=weight=NULL; alpha=.05; yaxismax=.5
-
-rmtl <- function(entry=NULL, times, event, eoi=1, group=NULL, weight=NULL, tau=NULL, alpha=.05, yaxismax=1){  
+rmtl <- function(times, event, eoi=1, group=NULL, weight=NULL, tau=NULL, alpha=.05, entry=NULL, ...){  
 
   if(sum(times<0)>0){print("Error: times must be positive.")
   }else{
-    if(sum(weight<=1)>0){print("Error: weights must be greater than 1.")
-    }else{
         
         #--- Prep input data ---
         if(is.null(entry)){entry <- rep(0, length(times))}
@@ -65,7 +57,7 @@ rmtl <- function(entry=NULL, times, event, eoi=1, group=NULL, weight=NULL, tau=N
           rmtl <- rep(NA, length(1:gg))
           groupval <- rep(NA, length(1:gg))
           rmtl.se <- rep(NA, length(1:gg))
-          plot(NULL, xlim=c(0, tau), ylim=c(0,yaxismax), xlab='Time', ylab='Cumulative incidence')
+          plot(NULL, xlim=c(0, tau), ylim=c(0,1), xlab='Time', ylab='Cumulative incidence', ...)
           
           for (g in 1:gg){
             
@@ -115,7 +107,6 @@ rmtl <- function(entry=NULL, times, event, eoi=1, group=NULL, weight=NULL, tau=N
             
             for(j in 1:(num.tj-1)){
               for(k in (j+1):num.tj){
-                #cov.theta[k,j] <- cov.theta[j,k] <- (theta[j]) * (theta[k]) * (-1/num.atrisk[j] + b[j])
                 cov.theta[k,j] <- cov.theta[j,k] <- (theta[j]) * (theta[k]) * (-1/mg[j] + b[j])
               }
             }
@@ -130,10 +121,6 @@ rmtl <- function(entry=NULL, times, event, eoi=1, group=NULL, weight=NULL, tau=N
             cov.f1 <- apply(cov.f10, 1, function(x){x[is.na(x)] <- 0;  cumsum(x)})
             
             var.f1 <- diag(cov.f1) # not sure if this is needed, but for sanity check
-            
-            #etm <- etmCIF(Surv(times, event != 0) ~ 1, data=data, etype=event, failcode=1)
-            #etm.se.0 <- sqrt(unname(etm[[1]]$cov[4,4,]))
-            #all.equal(etm.se.0, sqrt(var.f1))
             
             
             #--- RMTL and variance ---
@@ -216,7 +203,7 @@ rmtl <- function(entry=NULL, times, event, eoi=1, group=NULL, weight=NULL, tau=N
             print(rmtl.diff.round)
             cat("\n\n")
             
-            return(allres)
+            invisible(allres)
             
           } else { # No groups, thus no pairwise comparison
             
@@ -226,9 +213,7 @@ rmtl <- function(entry=NULL, times, event, eoi=1, group=NULL, weight=NULL, tau=N
             print(round(res[c(2:5)],3))
             cat("\n\n")
             
-            return(res)
-
-          }
+            invisible(res)
         
         }  
       }
