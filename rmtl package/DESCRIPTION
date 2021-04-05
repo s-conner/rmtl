@@ -1,0 +1,19 @@
+Package: rmtl
+Title: Restricted mean time lost (RMTL) with competing risks
+Version: 0.0.0.9000
+Authors@R: 
+    person(given = "Sarah C.",
+           family = "Conner",
+           role = c("aut", "cre"),
+           email = "sconner@bu.edu",
+           comment = c(ORCID = "0000-0002-0929-9948"))
+Description: The restricted mean survival time (RMST) has gained popularity, but in the presence of competing risks, one may be interested in the cause-specific restricted mean time lost (RMTL). The difference in RMTL is an alternative measure of association to the cause-specific hazard ratio or subdistribution hazard ratio with appealing interpretation that does not rely on proportional (cause-specific or subdistribution) hazards. In this package, we provide functions to calculate the unadjusted difference in RMTL and its variance, the inverse probability weighted (IPW) adjusted difference in RMTL to account for confounding, and a regression model for the RMTL estimated with inverse probability of censoring weighting (IPCW). For more details, see Conner and Trinquart (2021) Statistics in Medicine.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.1.1
+Imports: 
+    graphics,
+    stats,
+    survival
