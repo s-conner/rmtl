@@ -4,17 +4,16 @@
 ### Sarah Conner, package created March 12 2021
 
 
-#' Restricted mean time lost (RMTL) with competing risks
+#' Restricted mean time lost (RMTL) for competing risks adjusted with inverse probability weighted (IPW)
 #'
 #' @param times time to event (any-cause) or censoring
 #' @param event integer denoting the event type, where 0=censored. If there is only 1 event type (values take 0,1), results are equivalent to a non-competing risk setting
-#' @param eoi the event of interest, which should be an event value. Defaults to 1.
+#' @param eoi the event of interest, which should be an event value (defaults to 1).
 #' @param group exposure/treatment group. If left blank, function calculates the RMTL in the overall sample.
 #' @param weight user can specify weights to adjust for confounding, i.e. inverse probability weights, overlap weights, or survey weights. If left blank, function calculates unadjusted results.
 #' @param tau time horizon used to restrict event times. User can supply a clinically meaningful time horizon, otherwise the function calculates the minimum of the maximum event times in each exposure/treatment group
 #' @param alpha level of significance (defaults to 0.05).
 #' @param entry optional argument to allow delayed entry times (i.e., age as the time scale)
-#' @param ...
 #'
 #' @return IPW (or unadjusted) RMTL in each group, differences between groups, confidence intervals, p-values, and IPW cumulative incidence curves.
 #' @export
@@ -32,6 +31,7 @@ rmtl <- function(times, event, eoi=1, group=NULL, weight=NULL, tau=NULL, alpha=.
     alldat <- data.frame(entry, times, event, group, weight)
     alldat <- alldat[!is.na(alldat$group) & !is.na(alldat$times),]
     alldat <- alldat[order(group),]
+    z <- stats::qnorm(1-alpha/2)
 
 
     #--- If tau not specified, use minimum time from all groups. Check if provided tau is appropriate. ---
@@ -73,6 +73,10 @@ rmtl <- function(times, event, eoi=1, group=NULL, weight=NULL, tau=NULL, alpha=.
       groupval <- rep(NA, length(1:gg))
       rmtl.se <- rep(NA, length(1:gg))
       graphics::plot(NULL, xlim=c(0, tau), ylim=c(0,1), xlab='Time', ylab='Cumulative incidence', ...)
+      res.cif <- list()
+
+
+      #--- Loop through each exposure group ---
 
       for (g in 1:gg){
 
@@ -81,7 +85,7 @@ rmtl <- function(times, event, eoi=1, group=NULL, weight=NULL, tau=NULL, alpha=.
         groupval[g] <- (levels(alldat$group)[g])
         data <- alldat[which(alldat$group==(groupval[g])),]
 
-        tj <- data$times[data$event!=0]
+        tj <- data$times[data$event!=0] # note: tj may not include tau if no event occurs exactly at tau
         tj <- unique(tj[order(tj)])
         num.tj <- length(tj)
 
@@ -103,7 +107,6 @@ rmtl <- function(times, event, eoi=1, group=NULL, weight=NULL, tau=NULL, alpha=.
         cif1 <- cumsum(theta)
         graphics::lines(c(tj, tau), c(cif1, cif1[num.tj]), type="s", col=(g+2), lwd=2)
 
-
         #---  Variance of each theta ---
 
         a <- c(0,cumsum(num.ev/(mg * (num.atrisk - num.ev))))
@@ -111,8 +114,6 @@ rmtl <- function(times, event, eoi=1, group=NULL, weight=NULL, tau=NULL, alpha=.
 
         var.theta <- ((theta)^2) * (((num.atrisk - num.ev1)/(mg * num.ev1)) + a)
         var.theta[is.nan(var.theta)] <- 0
-
-        #sum.var.theta <- cumsum(var.theta)
 
 
         #---  Covariance of thetas ---
@@ -134,8 +135,7 @@ rmtl <- function(times, event, eoi=1, group=NULL, weight=NULL, tau=NULL, alpha=.
 
         cov.f10 <- apply(cov.theta, 2, function(x){x[is.na(x)] <- 0;  cumsum(x)})
         cov.f1 <- apply(cov.f10, 1, function(x){x[is.na(x)] <- 0;  cumsum(x)})
-
-        var.f1 <- diag(cov.f1) # not sure if this is needed, but for sanity check
+        var.f1 <- diag(cov.f1)
 
 
         #--- RMTL and variance ---
@@ -148,6 +148,21 @@ rmtl <- function(times, event, eoi=1, group=NULL, weight=NULL, tau=NULL, alpha=.
 
         rmtl.var <- sum(cov.f1.weight)
         rmtl.se[g] <- sqrt(rmtl.var)
+
+
+        #---  Export CIF and variance for plotting figures ---
+        # Note: due to restricting times to tau, if there is no event at tau, estimated CIFs will not reach tau.
+        # I add a little correction so the plot continues to tau.
+        # This is equivalent to estimating the CIF past tau.
+
+        res.cif.g <- list()
+        res.cif.g[[length(res.cif.g)+1]] <- c(cif1, cif1[num.tj])
+        res.cif.g[[length(res.cif.g)+1]] <- c(sqrt(var.f1), sqrt(var.f1[num.tj]))
+        res.cif.g[[length(res.cif.g)+1]] <- c(tj, tau)
+        res.cif.g[[length(res.cif.g)+1]] <- c(cif1 - z*sqrt(var.f1), cif1[num.tj] - z*sqrt(var.f1[num.tj]))
+        res.cif.g[[length(res.cif.g)+1]] <- c(cif1 + z*sqrt(var.f1), cif1[num.tj] + z*sqrt(var.f1[num.tj]))
+        names(res.cif.g) <- c('cif', 'se.cif', 'tj', 'cif.cil', 'cif.ciu')
+        res.cif[[length(res.cif)+1]] <- res.cif.g
 
       }
 
@@ -162,9 +177,8 @@ rmtl <- function(times, event, eoi=1, group=NULL, weight=NULL, tau=NULL, alpha=.
 
       #--- Compare RMTL between groups and compile output---
 
-      z <- stats::qnorm(1-alpha/2)
       res <- data.frame(groupval, rmtl, rmtl.se, cil=rmtl-(z*rmtl.se), ciu=rmtl+(z*rmtl.se))
-
+      names(res.cif) <- groupval
       pwc <- ((gg^2)-gg)/2   #number of pairwise comparisons
 
 
@@ -202,7 +216,7 @@ rmtl <- function(times, event, eoi=1, group=NULL, weight=NULL, tau=NULL, alpha=.
 
       if(pwc>0){
 
-        allres <- list(rmtl=res, rmtl.diff=res.diff)
+        allres <- list(rmtl=res, rmtl.diff=res.diff, cif=res.cif)
 
         cat("RMTL per group, tau=", tau, "\n\n", sep="")
         rmtl.round <- round(allres$rmtl[,c(2:5)],3)
@@ -222,13 +236,15 @@ rmtl <- function(times, event, eoi=1, group=NULL, weight=NULL, tau=NULL, alpha=.
 
       } else { # No groups, thus no pairwise comparison
 
+        allres <- list(rmtl=res, cif=res.cif)
+
         cat("RMTL per group, tau=", tau, "\n\n", sep="")
         colnames(res) <- c("Group", "RMTL", "SE", "CIL", "CIU")
         rownames(res) <- c(paste("Group", res$Group,' '))
         print(round(res[c(2:5)],3))
         cat("\n\n")
 
-        invisible(res)
+        invisible(allres)
 
       }
     }

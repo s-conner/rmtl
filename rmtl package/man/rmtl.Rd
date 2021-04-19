@@ -2,7 +2,7 @@
 % Please edit documentation in R/rmtl.R
 \name{rmtl}
 \alias{rmtl}
-\title{Restricted mean time lost (RMTL) with competing risks}
+\title{Restricted mean time lost (RMTL) for competing risks adjusted with inverse probability weighted (IPW)}
 \usage{
 rmtl(
   times,
@@ -21,7 +21,7 @@ rmtl(
 
 \item{event}{integer denoting the event type, where 0=censored. If there is only 1 event type (values take 0,1), results are equivalent to a non-competing risk setting}
 
-\item{eoi}{the event of interest, which should be an event value. Defaults to 1.}
+\item{eoi}{the event of interest, which should be an event value (defaults to 1).}
 
 \item{group}{exposure/treatment group. If left blank, function calculates the RMTL in the overall sample.}
 
@@ -32,12 +32,10 @@ rmtl(
 \item{alpha}{level of significance (defaults to 0.05).}
 
 \item{entry}{optional argument to allow delayed entry times (i.e., age as the time scale)}
-
-\item{...}{}
 }
 \value{
 IPW (or unadjusted) RMTL in each group, differences between groups, confidence intervals, p-values, and IPW cumulative incidence curves.
 }
 \description{
-Restricted mean time lost (RMTL) with competing risks
+Restricted mean time lost (RMTL) for competing risks adjusted with inverse probability weighted (IPW)
 }
