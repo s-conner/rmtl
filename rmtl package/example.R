@@ -60,13 +60,13 @@ simdata <- function(n, alpha0, gamma, rho, psi11, psi21, cens){
 
 
 
-
 # --- Generate data ---
+
 dat <- simdata(n=500, gamma=1.5, rho=-1.5, psi11=0.5, psi21=-2, alpha0=log(.25/(1-.25)), cens=2.18)
 
+# Indicators treating the competing event as censored
 dat$i.event1 <- ifelse(dat$event==1, 1, 0)
 dat$i.event2 <- ifelse(dat$event==2, 1, 0)
-
 
 
 
@@ -85,6 +85,11 @@ plot(ipw_res$cif[[1]]$tj, ipw_res$cif[[1]]$cif, type='s', xlab='Time', ylab='Cum
 lines(ipw_res$cif[[2]]$tj, ipw_res$cif[[2]]$cif, type='s', col=2)
 abline(v=1, col=1, lty=3, lwd=2)
 
+# Alternatively, use the CIF function
+ipw_cif <- cif(times=dat$x, event=dat$event, eoi=1, group=as.factor(dat$a), weight=dat$weight)
+plot(ipw_cif[[1]]$tj, ipw_cif[[1]]$cif, type='s', xlab='Time', ylab='Cumulative incidence')
+lines(ipw_cif[[2]]$tj, ipw_cif[[2]]$cif, type='s', col=2)
+
 
 
 # --- Apply IPCW regression model for difference in RMTL conditional on covariates ---
@@ -93,103 +98,39 @@ abline(v=1, col=1, lty=3, lwd=2)
 covariates <- dat[, c('a', 'z1', 'z2', 'z3', 'z4', 'z5')]
 
 # Censoring weights estimated from whole sample (default option)
-# Can use strata=TRUE to derive censoring weights in each exposure arm
 ipcw_res <- rmtl_mod(times=dat$x, event=dat$event, eoi=1, tau=1, cov=as.matrix(covariates), strata=FALSE)
 
+# Can use strata=TRUE to derive censoring weights in each exposure arm
+ipcw_res2 <- rmtl_mod(times=dat$x, event=dat$event, eoi=1, tau=1, cov=as.matrix(covariates), strata=TRUE, group=as.factor(dat$a))
 
-# Compare IPW marginal difference in RMTL to conditional difference in RMTL; both ~0.06
+# Compare IPW marginal difference in RMTL to conditional difference in RMTL (beta coefficient of a)
 ipw_res$rmtl.diff
 ipcw_res$res[2,]
-
+ipcw_res2$res[2,]
 
 
 
 
 # --- Plot IPW estimator --- #
+
 # Plot with and without accounting for competing risks
 # i.e. treat competing event as censored (1- Kaplan Meier method, Conner Stat Med 2019)
 # Notice the dotted 1-KM curves overestimate the CIF for each event and in each exposure group
 
+ipw_cif_naive <- cif(times=dat$x, event=dat$i.event1, eoi=1, group=as.factor(dat$a), weight=dat$weight)
 
-# Subset for plots
-dat.a0 <- dat[dat$a==0,]
-dat.a1 <- dat[dat$a==1,]
-
-
-# Function for IPW CIF and 1-KM
-
-cif <- function(times, event, weight=NULL, tau){
-
-  if(is.null(weight)){weight <- rep(1, length(times))}
-  entry=rep(0, length(times))
-
-  data <-  data.frame(entry, times, event, weight)
-  data$event[data$times>tau] <- 0
-  data$times[data$times>tau] <- tau
-
-  tj <- data$times[data$event!=0]
-  tj <- unique(tj[order(tj)])
-  num.tj <- length(tj)
-
-  num.atrisk <- sapply(tj, function(tj) sum(data$weight[data$entry<tj & data$times>=tj]))
-  num.ev1 <- sapply(tj, function(tj) sum(data$weight[data$event==1 & data$times==tj]))
-  num.ev2 <- sapply(tj, function(tj) sum(data$weight[data$event==2 & data$times==tj]))
-  num.ev <- num.ev1 + num.ev2
-
-  h1 <- num.ev1/num.atrisk
-  h2 <- num.ev2/num.atrisk
-  h <- num.ev/num.atrisk
-
-  s <- cumprod(c(1, 1 - h))
-  s <- s[1:length(s)-1]
-
-  theta1 <- s * h1
-  theta2 <- s * h2
-
-  cif1 <- cumsum(theta1)
-  cif2 <- cumsum(theta2)
-
-  cr1 <- 1 - cumprod(c(1, 1 - h1[1:num.tj-1]))
-  cr2 <- 1 - cumprod(c(1, 1 - h2[1:num.tj-1]))
-
-  return(list(tj=tj, cif1=cif1, cif2=cif2, cr1=cr1, cr2=cr2))
-}
-
-#  Derive CIFs and 1-KMs in each exposure group
-
-a0 <- cif(dat.a0$x, dat.a0$event, dat.a0$weight, tau=1)
-a1 <- cif(dat.a1$x, dat.a1$event, dat.a1$weight, tau=1)
-
-
-# Plot
-
-palette <- colorschemes$BrowntoBlue.10[c(2,9)]
-
-par(mfrow=c(1,2))
-
-plot(a0$tj, a0$cif1, type='s', col=palette[1], lty=1, ylim=c(0, 1), main='Event 1',
-     xlab='Time (years)', ylab='Cumulative incidence', lwd=2)
-lines(a0$tj, a0$cr1, type='s', col=palette[1], lty=2, lwd=2)
-lines(a1$tj, a1$cif1, type='s', col=palette[2], lty=1, lwd=2)
-lines(a1$tj, a1$cr1, type='s', col=palette[2], lty=2, lwd=2)
-legend('topleft', legend=c('A=0, IPW CIF', 'A=0, IPW 1-KM', 'A=1, IPW CIF', 'A=1, IPW 1-KM'),
-       lty=c(1,2,1,2), col=c(palette[1],palette[1],palette[2],palette[2]), lwd=rep(2,4))
-
-plot(a0$tj, a0$cif2, type='s', col=palette[1], lty=1, ylim=c(0, 1), main='Event 2',
-     xlab='Time (years)', ylab='Cumulative incidence', lwd=2)
-lines(a0$tj, a0$cr2, type='s', col=palette[1], lty=2, lwd=2)
-lines(a1$tj, a1$cif2, type='s', col=palette[2], lty=1, lwd=2)
-lines(a1$tj, a1$cr2, type='s', col=palette[2], lty=2, lwd=2)
-legend('topleft', legend=c('A=0, IPW CIF', 'A=0, IPW 1-KM', 'A=1, IPW CIF', 'A=1, IPW 1-KM'),
-       lty=c(1,2,1,2), col=c(palette[1],palette[1],palette[2],palette[2]), lwd=rep(2,4))
-
-
+plot(ipw_cif_naive[[1]]$tj, ipw_cif_naive[[1]]$cif, type='s', lty=2, xlab='Time', ylab='Cumulative incidence')
+lines(ipw_cif_naive[[2]]$tj, ipw_cif_naive[[2]]$cif, type='s', col=2, lty=2)
+lines(ipw_cif[[1]]$tj, ipw_cif[[1]]$cif, type='s')
+lines(ipw_cif[[2]]$tj, ipw_cif[[2]]$cif, type='s', col=2)
+legend('bottomright', legend=c('A=0, 1-KM', 'A=0, CIF', 'A=1, 1-KM', 'A=1, CIF'), col=c(1,1,2,2), lty=c(2,1,2,1))
 
 
 
 # --- IPCW model ignoring competing risks ----
+
 # Notice betas differ from model accounting for competing risk
-# This result is equivalent to using rmst2() in package survRM2
+# This result is equivalent to using rmst2() in package survRM2, but with flipped magnitude (difference in RMTL instead of RMTL)
 ipcw_res_ignore <- rmtl.ipcw(times=dat$x, event=dat$i.event1, tau=1, cov=as.matrix(covariates), strata=FALSE)
 
 

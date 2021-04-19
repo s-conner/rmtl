@@ -30,14 +30,15 @@ cif <- function(times, event, eoi=1, group=NULL, weight=NULL, alpha=.05, entry=N
 
   z <- stats::qnorm(1-alpha/2)
   gg <- length(levels(alldat$group))
+  groupval <- rep(NA, length(1:gg))
   res.cif <- list()
 
   for (g in 1:gg){
 
     #--- Derive CIF and related quantities (theta, hazards, etc) ---
 
-    groupval <- (levels(alldat$group)[g])
-    data <- alldat[which(alldat$group==(groupval)),]
+    groupval[g] <- (levels(alldat$group)[g])
+    data <- alldat[which(alldat$group==(groupval[g])),]
 
     tj <- data$times[data$event!=0]
     tj <- unique(tj[order(tj)])
@@ -96,6 +97,7 @@ cif <- function(times, event, eoi=1, group=NULL, weight=NULL, alpha=.05, entry=N
 
     #---  Export CIF and variance ---
 
+    res.cif.g <- list()
     res.cif.g[[length(res.cif.g)+1]] <- cif1
     res.cif.g[[length(res.cif.g)+1]] <- sqrt(var.f1)
     res.cif.g[[length(res.cif.g)+1]] <- tj
