@@ -1,14 +1,11 @@
 ### Code to simulate data and apply IPW and IPCW methods
 ### for adjusted difference in RMTL with competing risks
 
-### Last updated by Sarah Conner on October 22 2020
+### Last updated by Sarah Conner on April 19 2021
 
 library(survival)
-library(dichromat)
-#source("functions//rmtl_ipw_function.R")
-#source("functions//rmtl_ipcw_function.R")
-
 library(rmtl)
+
 
 # --- Function to simulate competing risks data ---
 
@@ -78,17 +75,21 @@ p.a <- predict(ipw.mod, dat, type='response')
 dat$weight <- (dat$a/p.a) + (1-dat$a)/(1-p.a)
 
 # Estimate RMTLs and export results
-ipw_res <- rmtl(times=dat$x, event=dat$event, eoi=1, group=as.factor(dat$a), weight=dat$weight, tau=1)
+ipw.res <- rmtl(times=dat$x, event=dat$event, eoi=1, group=as.factor(dat$a), weight=dat$weight, tau=1)
 
 # Plot CIFs from RMTL output
-plot(ipw_res$cif[[1]]$tj, ipw_res$cif[[1]]$cif, type='s', xlab='Time', ylab='Cumulative incidence')
-lines(ipw_res$cif[[2]]$tj, ipw_res$cif[[2]]$cif, type='s', col=2)
+plot(ipw.res$cif[[1]]$tj, ipw.res$cif[[1]]$cif, type='s', xlab='Time', ylab='Cumulative incidence')
+lines(ipw.res$cif[[2]]$tj, ipw.res$cif[[2]]$cif, type='s', col=2)
 abline(v=1, col=1, lty=3, lwd=2)
 
 # Alternatively, use the CIF function
-ipw_cif <- cif(times=dat$x, event=dat$event, eoi=1, group=as.factor(dat$a), weight=dat$weight)
-plot(ipw_cif[[1]]$tj, ipw_cif[[1]]$cif, type='s', xlab='Time', ylab='Cumulative incidence')
-lines(ipw_cif[[2]]$tj, ipw_cif[[2]]$cif, type='s', col=2)
+ipw.cif <- cif(times=dat$x, event=dat$event, eoi=1, group=as.factor(dat$a), weight=dat$weight)
+plot(ipw.cif[[1]]$tj, ipw.cif[[1]]$cif, type='s', xlab='Time', ylab='Cumulative incidence', ylim=c(0,1))
+lines(ipw.cif[[1]]$tj, ipw.cif[[1]]$cif.cil, type='s', lty=2)
+lines(ipw.cif[[1]]$tj, ipw.cif[[1]]$cif.ciu, type='s', lty=2)
+lines(ipw.cif[[2]]$tj, ipw.cif[[2]]$cif, type='s', col=2)
+lines(ipw.cif[[2]]$tj, ipw.cif[[2]]$cif.cil, type='s', col=2, lty=2)
+lines(ipw.cif[[2]]$tj, ipw.cif[[2]]$cif.ciu, type='s', col=2, lty=2)
 
 
 
@@ -98,31 +99,31 @@ lines(ipw_cif[[2]]$tj, ipw_cif[[2]]$cif, type='s', col=2)
 covariates <- dat[, c('a', 'z1', 'z2', 'z3', 'z4', 'z5')]
 
 # Censoring weights estimated from whole sample (default option)
-ipcw_res <- rmtl_mod(times=dat$x, event=dat$event, eoi=1, tau=1, cov=as.matrix(covariates), strata=FALSE)
+mod.res <- rmtl_mod(times=dat$x, event=dat$event, eoi=1, tau=1, cov=as.matrix(covariates), strata=FALSE)
 
 # Can use strata=TRUE to derive censoring weights in each exposure arm
-ipcw_res2 <- rmtl_mod(times=dat$x, event=dat$event, eoi=1, tau=1, cov=as.matrix(covariates), strata=TRUE, group=as.factor(dat$a))
+mod.res2 <- rmtl_mod(times=dat$x, event=dat$event, eoi=1, tau=1, cov=as.matrix(covariates), strata=TRUE, group=as.factor(dat$a))
 
 # Compare IPW marginal difference in RMTL to conditional difference in RMTL (beta coefficient of a)
-ipw_res$rmtl.diff
-ipcw_res$res[2,]
-ipcw_res2$res[2,]
+ipw.res$rmtl.diff
+mod.res$res[2,]
+mod.res2$res[2,]
 
 
 
 
-# --- Plot IPW estimator --- #
+# --- More figures: plot IPW CIF and 1-KM (without competing risks) --- #
 
 # Plot with and without accounting for competing risks
 # i.e. treat competing event as censored (1- Kaplan Meier method, Conner Stat Med 2019)
 # Notice the dotted 1-KM curves overestimate the CIF for each event and in each exposure group
 
-ipw_cif_naive <- cif(times=dat$x, event=dat$i.event1, eoi=1, group=as.factor(dat$a), weight=dat$weight)
+ipw.cif.naive <- cif(times=dat$x, event=dat$i.event1, eoi=1, group=as.factor(dat$a), weight=dat$weight)
 
-plot(ipw_cif_naive[[1]]$tj, ipw_cif_naive[[1]]$cif, type='s', lty=2, xlab='Time', ylab='Cumulative incidence')
-lines(ipw_cif_naive[[2]]$tj, ipw_cif_naive[[2]]$cif, type='s', col=2, lty=2)
-lines(ipw_cif[[1]]$tj, ipw_cif[[1]]$cif, type='s')
-lines(ipw_cif[[2]]$tj, ipw_cif[[2]]$cif, type='s', col=2)
+plot(ipw.cif.naive[[1]]$tj, ipw.cif.naive[[1]]$cif, type='s', lty=2, xlab='Time', ylab='Cumulative incidence')
+lines(ipw.cif.naive[[2]]$tj, ipw.cif.naive[[2]]$cif, type='s', col=2, lty=2)
+lines(ipw.cif[[1]]$tj, ipw.cif[[1]]$cif, type='s')
+lines(ipw.cif[[2]]$tj, ipw.cif[[2]]$cif, type='s', col=2)
 legend('bottomright', legend=c('A=0, 1-KM', 'A=0, CIF', 'A=1, 1-KM', 'A=1, CIF'), col=c(1,1,2,2), lty=c(2,1,2,1))
 
 
@@ -131,7 +132,7 @@ legend('bottomright', legend=c('A=0, 1-KM', 'A=0, CIF', 'A=1, 1-KM', 'A=1, CIF')
 
 # Notice betas differ from model accounting for competing risk
 # This result is equivalent to using rmst2() in package survRM2, but with flipped magnitude (difference in RMTL instead of RMTL)
-ipcw_res_ignore <- rmtl.ipcw(times=dat$x, event=dat$i.event1, tau=1, cov=as.matrix(covariates), strata=FALSE)
+mod.res_ignore <- rmtl.ipcw(times=dat$x, event=dat$i.event1, tau=1, cov=as.matrix(covariates), strata=FALSE)
 
 
 
