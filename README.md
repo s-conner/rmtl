@@ -11,4 +11,5 @@ Folders 'simulation ipcw' and 'simulation ipw' include codes to replicate our si
 I created an R package, which you can install with the code below!
 
 library(devtools)
+
 install_github("s-conner/rmtl/rmtl package")
